@@ -1,0 +1,8 @@
+fastmcp
+matplotlib
+pandas
+numpy
+seaborn
+uvicorn
+pydantic
+mermaid-py
