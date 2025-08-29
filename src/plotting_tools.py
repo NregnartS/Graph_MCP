@@ -750,8 +750,11 @@ class PlottingTools:
             
             # 使用类初始化时检查的结果来决定使用哪种方式
             if self.mmdc_available:
-                # 创建临时mmd文件
-                temp_mmd_path = os.path.join(os.path.dirname(os.path.abspath(save_path)), 'temp_chart.mmd')
+                # 创建唯一的临时mmd文件，避免多客户端并发调用时的冲突
+                import uuid
+                temp_dir = os.path.dirname(os.path.abspath(save_path))
+                unique_id = uuid.uuid4().hex[:8]  # 生成8位唯一ID
+                temp_mmd_path = os.path.join(temp_dir, f'temp_chart_{unique_id}.mmd')
                 try:
                     with open(temp_mmd_path, 'w', encoding='utf-8') as f:
                         f.write(mermaid_code)
