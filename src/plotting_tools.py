@@ -6,6 +6,7 @@ import matplotlib.font_manager as fm
 import seaborn as sns
 import matplotlib.pyplot as plt
 from mermaid import Mermaid
+import subprocess
 
 
 # 设置matplotlib中文字体和全局样式
@@ -88,6 +89,23 @@ class PlottingTools:
                 'grid.color': '#e9ecef',
             }
         }
+        
+        # 在初始化时检查系统是否存在mmdc命令，只检查一次
+        self.mmdc_available = self._check_mmdc_available()
+        if self.mmdc_available:
+            print("mmdc命令已检测到，将使用mmdc生成mermaid图表")
+        else:
+            print("mmdc命令不可用，将使用mermaid-py库生成mermaid图表")
+            
+    def _check_mmdc_available(self):
+        """检查系统是否存在mmdc命令"""
+        try:
+            import subprocess
+            # 尝试运行mmdc --version命令来检查是否安装
+            subprocess.run(['mmdc', '--version'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            return True
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return False
         
     def generate_line_chart(
         self,
@@ -729,12 +747,49 @@ class PlottingTools:
                 with open(save_path, 'w', encoding='utf-8') as f:
                     f.write(mermaid_code)
                 return os.path.abspath(save_path)
-            mermaid = Mermaid(mermaid_code)
-            if file_ext == '.png':
-                mermaid.to_png(save_path)
-            elif file_ext == '.svg':
-                mermaid.to_svg(save_path)
-            return os.path.abspath(save_path)
+            
+            # 使用类初始化时检查的结果来决定使用哪种方式
+            if self.mmdc_available:
+                # 创建临时mmd文件
+                temp_mmd_path = os.path.join(os.path.dirname(os.path.abspath(save_path)), 'temp_chart.mmd')
+                try:
+                    with open(temp_mmd_path, 'w', encoding='utf-8') as f:
+                        f.write(mermaid_code)
+                    
+                    # 执行mmdc命令并捕获可能的异常
+                    try:
+                        result = subprocess.run(
+                            ['mmdc', '-i', temp_mmd_path, '-o', save_path],
+                            check=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True
+                        )
+                    except subprocess.CalledProcessError as e:
+                        # 获取详细的错误信息
+                        error_msg = f"返回码: {e.returncode}\n" \
+                                  f"标准错误: {e.stderr}\n" 
+                        # 抛出包含详细错误信息的异常
+                        raise ValueError(f"使用mmdc生成Mermaid图表失败: {error_msg}") from e
+                    
+                    return os.path.abspath(save_path)
+                finally:
+                    # 确保删除临时文件
+                    try:
+                        if os.path.exists(temp_mmd_path):
+                            os.remove(temp_mmd_path)
+                    except Exception as cleanup_error:
+                        # 记录清理失败但不阻止主流程
+                        import logging
+                        logging.warning(f"清理临时文件失败: {str(cleanup_error)}")
+            else:
+                # 如果mmdc命令不可用，使用mermaid-py作为替代方案
+                mermaid = Mermaid(mermaid_code)
+                if file_ext == '.png':
+                    mermaid.to_png(save_path)
+                elif file_ext == '.svg':
+                    mermaid.to_svg(save_path)
+                return os.path.abspath(save_path)
         except Exception as e:
             raise ValueError(f"生成Mermaid图表失败: {str(e)}")
 

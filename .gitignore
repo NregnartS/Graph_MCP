@@ -48,3 +48,4 @@ test_outputs/
 # Temporary files
 *.tmp
 *.temp
+node_modules

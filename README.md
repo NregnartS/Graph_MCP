@@ -9,20 +9,21 @@
 - **饼图**：支持显示百分比、自定义颜色
 - **散点图**：支持颜色编码、大小编码
 - **热力图**：用于展示矩阵数据的热力分布
-- **Mermaid图表**：支持生成Mermaid流程图、时序图等
+- **Mermaid图表**：默认优先使用mermaid-cli（高性能）生成图表，如未安装则使用mermaid-py库作为备选方案，支持生成Mermaid流程图、时序图等
 
 ## 安装指南
 
 ### 前提条件
 - Python 3.10+ 
 - Conda环境（推荐使用fastmcp_env环境）
+- Node.js（可选，用于安装mermaid-cli以获得更好的Mermaid图表生成性能）
 
 ### 安装步骤
 
 1. 克隆或下载项目代码
 
-2. 安装项目依赖（两种方式任选其一）
-   
+2. 安装项目依赖
+#### 安装python依赖
    **方式一：使用pip安装依赖**
    ```bash
    pip install -r requirements.txt
@@ -43,6 +44,22 @@
    - 默认情况下，环境会安装在conda的envs目录下
    - 使用--prefix参数可以自定义环境安装路径
    - 激活自定义路径的环境时需要使用完整路径
+
+#### 安装mermaid-cli（可选但推荐）
+
+  mermaid-cli提供比mermaid-py更好的性能和稳定性，我们建议安装它以获得最佳体验：
+
+  ```bash
+  # 使用npm全局安装mermaid-cli
+  npm install -g @mermaid-js/mermaid-cli
+
+  # 验证安装是否成功
+  mmdc --version
+  ```
+
+  **注意**：安装mermaid-cli需要先安装Node.js。如果您的系统尚未安装Node.js，请先从[Node.js官网](https://nodejs.org/)下载并安装。
+
+  如果未安装mermaid-cli，系统会自动使用requirements.txt中已包含的mermaid-py库作为备选方案。
 
 ## 使用方法
 
