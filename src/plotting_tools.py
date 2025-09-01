@@ -7,6 +7,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from mermaid import Mermaid
 import subprocess
+import logging
+
+# 获取logger实例
+logger = logging.getLogger(__name__)
 
 
 # 设置matplotlib中文字体和全局样式
@@ -27,12 +31,12 @@ def setup_matplotlib_fonts():
         first_font_name, _ = chinese_fonts[0]
         plt.rcParams["font.family"] = [first_font_name]
         plt.rcParams["font.sans-serif"] = [first_font_name]
-        print(f"已设置matplotlib字体为: {first_font_name}")
+        logger.info(f"已设置matplotlib字体为: {first_font_name}")
     else:
         # 如果找不到具体字体，使用通用设置
         plt.rcParams["font.family"] = ["WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "Heiti TC", "SimHei"]
         plt.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "Heiti TC", "SimHei"]
-        print("已设置matplotlib使用默认中文字体族")
+        logger.info("已设置matplotlib使用默认中文字体族")
     
     # 设置全局样式参数
     plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
@@ -93,9 +97,9 @@ class PlottingTools:
         # 在初始化时检查系统是否存在mmdc命令，只检查一次
         self.mmdc_available = self._check_mmdc_available()
         if self.mmdc_available:
-            print("mmdc命令已检测到，将使用mmdc生成mermaid图表")
+            logger.info("mmdc命令已检测到，将使用mmdc生成mermaid图表")
         else:
-            print("mmdc命令不可用，将使用mermaid-py库生成mermaid图表")
+            logger.info("mmdc命令不可用，将使用mermaid-py库生成mermaid图表")
             
     def _check_mmdc_available(self):
         """检查系统是否存在mmdc命令"""

@@ -6,16 +6,46 @@ from operator import methodcaller
 from mcp.server.fastmcp import FastMCP
 import threading
 import inspect
+import argparse
+import os
 from plotting_tools import PlottingTools
 from plot_params import validate_and_convert_params
 import logging
 
 # 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+import os
+# 确保日志目录存在
+log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
+os.makedirs(log_dir, exist_ok=True)
+
+# 配置基础日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        # 控制台处理器
+        logging.StreamHandler(),
+        # 文件处理器 - 记录所有日志
+        logging.FileHandler(os.path.join(log_dir, 'plotting_service.log'), encoding='utf-8'),
+        # 错误日志文件处理器 - 只记录错误及以上级别日志
+        logging.FileHandler(os.path.join(log_dir, 'plotting_service_error.log'), encoding='utf-8')
+    ]
+)
+
+# 设置错误日志处理器的级别为ERROR
+for handler in logging.getLogger().handlers:
+    if isinstance(handler, logging.FileHandler) and 'error.log' in handler.baseFilename:
+        handler.setLevel(logging.ERROR)
+
 logger = logging.getLogger(__name__)
 
+# 解析命令行参数
+parser = argparse.ArgumentParser(description='MCP绘图服务')
+parser.add_argument('--port', type=int, default=16666, help='服务端口号，默认为16666')
+args = parser.parse_args()
+
 # 创建FastMCP服务器实例
-mcp = FastMCP(name="PlottingService",host="0.0.0.0",port=16666)
+mcp = FastMCP(name="PlottingService", host="0.0.0.0", port=args.port)
 
 # 创建绘图工具实例
 drawing_tools = PlottingTools()
