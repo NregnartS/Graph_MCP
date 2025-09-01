@@ -7,28 +7,21 @@ import argparse
 import logging
 # 导入日志配置
 from src.utils.logging_config import logger
-# 导入图表生成函数
-from src.charts.line_chart import generate_line_chart
-from src.charts.bar_chart import generate_bar_chart
-from src.charts.pie_chart import generate_pie_chart
-from src.charts.scatter_plot import generate_scatter_plot
-from src.charts.heatmap import generate_heatmap
-from src.charts.mermaid_chart import generate_mermaid_chart
 
 # 导入工具函数
 from src.utils.plotting_utils import (
-    ChartConfig,
+    chart_config,
     process_nested_params,
     validate_parameters,
     get_target_function,
     filter_kwargs,
-    check_required_params,
     execute_plotting,
-    handle_plotting_exception
+    handle_plotting_exception,
+    setup_chart_theme
 )
 
-# 导入字体工具
-from src.utils.font_utils import setup_fonts
+# 导入错误处理类
+from src.utils.error_handling import ValidationError, ChartGenerationError
 
 # 解析命令行参数
 parser = argparse.ArgumentParser(description='MCP绘图服务')
@@ -49,22 +42,12 @@ if args.debug:
 mcp = FastMCP(name="PlottingService", host="0.0.0.0", port=args.port)
 
 
-# 初始化字体设置
+# 初始化字体设置和图表主题
 try:
-    setup_fonts()
-    logger.info("字体设置已完成")
+    setup_chart_theme()
+    logger.info("图表主题和字体设置已完成")
 except Exception as e:
-    logger.error(f"字体设置失败: {str(e)}")
-
-# 为ChartConfig添加图表函数映射
-ChartConfig.functions = {
-    'line_chart': generate_line_chart,
-    'bar_chart': generate_bar_chart,
-    'pie_chart': generate_pie_chart,
-    'scatter_plot': generate_scatter_plot,
-    'heatmap': generate_heatmap,
-    'mermaid_chart': generate_mermaid_chart
-}
+    logger.error(f"图表主题和字体设置失败: {str(e)}")
 
 @mcp.tool()
 def create_plotting_task(plot_type, **params):
@@ -151,31 +134,37 @@ def create_plotting_task(plot_type, **params):
         dict: 包含图表保存路径和状态的响应
     """
     try:
-        # logger.info(f"接收到的参数: plot_type={plot_type}, params={params}")
+        logger.info(f"接收到图表生成请求: plot_type={plot_type}")
         
         # 处理嵌套参数结构
         params = process_nested_params(params)
-        # logger.debug(f"处理后的参数: {params}")
+        logger.debug(f"处理后的参数: {params}")
         
         # 检查图表类型支持
-        if plot_type not in ChartConfig.functions:
-            raise ValueError(f"不支持的图表类型: {plot_type}")
+        if not chart_config.is_supported(plot_type):
+            supported_types = ', '.join(chart_config.supported_chart_types)
+            raise ValidationError(f"不支持的图表类型: {plot_type}。支持的类型有: {supported_types}")
         
         # 验证参数
         validate_parameters(plot_type, params)
         
+        # 单独处理主题设置
+        if 'theme' in params:
+            try:
+                setup_chart_theme(params['theme'])
+                logger.debug(f"应用自定义主题: {params['theme']}")
+            except Exception as e:
+                logger.warning(f"设置主题时出错，但继续执行: {str(e)}")
+        
         # 获取绘图函数和过滤参数
-        plot_func = ChartConfig.functions[plot_type]
-        target_func, target_sig = get_target_function(plot_type, plot_func)
+        target_func, target_sig = get_target_function(plot_type)
         filtered_params = filter_kwargs(params, target_sig)
         
-        # 检查必需参数
-        check_required_params(plot_type, params)
-        
         # 执行绘图
-        logger.info(f"生成图表，图表类型: {plot_type}")
-        result = execute_plotting(plot_func, filtered_params, target_sig)
+        logger.info(f"开始生成图表，图表类型: {plot_type}")
+        result = execute_plotting(target_func, filtered_params, target_sig)
         
+        logger.info(f"图表生成成功，保存路径: {result}")
         return {"status": "success", "message": "图表生成成功", "save_path": result}
     except Exception as e:
         return handle_plotting_exception(e, args.debug)

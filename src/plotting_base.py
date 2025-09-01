@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 import os
 import logging
+# 导入字体工具
+from src.utils.font_utils import set_matplotlib_fonts
 
 # 获取logger实例
 logger = logging.getLogger(__name__)
@@ -28,47 +29,24 @@ class PlottingBase:
                 'grid.color': '#cccccc',
             }
         }
-        # 确保负号正确显示
-        plt.rcParams["axes.unicode_minus"] = False
         # 缓存字体信息
         self._font_cache = None
     
     def _setup_fonts(self):
         """设置matplotlib中文字体和全局样式"""
-        # 查找并设置系统中可用的中文字体
-        chinese_fonts = []
-        for font_path in fm.findSystemFonts():
-            try:
-                font_filename = os.path.basename(font_path)
-                if any(keyword in font_filename.lower() for keyword in ['wqy', 'uming', 'hei', 'song']):
-                    font_name = fm.FontProperties(fname=font_path).get_name()
-                    chinese_fonts.append((font_name, font_path))
-            except:
-                pass
-        
-        # 优先使用找到的具体中文字体
-        if chinese_fonts:
-            first_font_name, _ = chinese_fonts[0]
-            plt.rcParams["font.family"] = [first_font_name]
-            plt.rcParams["font.sans-serif"] = [first_font_name]
-            logger.info(f"已设置matplotlib字体为: {first_font_name}")
-            # 缓存字体信息
-            self._font_cache = first_font_name
+        # 使用font_utils中的字体设置函数
+        success = set_matplotlib_fonts()
+        if success:
+            # 设置额外的全局样式参数
+            plt.rcParams["axes.labelweight"] = "bold"   # 坐标轴标签加粗
+            plt.rcParams["axes.titleweight"] = "bold"   # 标题加粗
+            plt.rcParams["axes.grid"] = True           # 默认显示网格
+            plt.rcParams["grid.alpha"] = 0.3           # 网格透明度
+            plt.rcParams["grid.linestyle"] = "--"       # 网格线型
+            plt.rcParams["figure.facecolor"] = "white"  # 图形背景色
+            plt.rcParams["figure.figsize"] = (10, 6)   # 默认图形大小
         else:
-            # 如果找不到具体字体，使用通用设置
-            plt.rcParams["font.family"] = ["WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "Heiti TC", "SimHei"]
-            plt.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "Heiti TC", "SimHei"]
-            logger.info("已设置matplotlib使用默认中文字体族")
-        
-        # 设置全局样式参数
-        plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
-        plt.rcParams["axes.labelweight"] = "bold"   # 坐标轴标签加粗
-        plt.rcParams["axes.titleweight"] = "bold"   # 标题加粗
-        plt.rcParams["axes.grid"] = True           # 默认显示网格
-        plt.rcParams["grid.alpha"] = 0.3           # 网格透明度
-        plt.rcParams["grid.linestyle"] = "--"       # 网格线型
-        plt.rcParams["figure.facecolor"] = "white"  # 图形背景色
-        plt.rcParams["figure.figsize"] = (10, 6)   # 默认图形大小
+            logger.warning("字体设置失败，使用matplotlib默认配置")
     
     def _set_theme(self, theme_name: str):
         """设置图表主题
