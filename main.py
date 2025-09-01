@@ -1,54 +1,70 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from crypt import methods
-from operator import methodcaller
 from mcp.server.fastmcp import FastMCP
 import threading
-import inspect
 import argparse
-import os
-from plotting_tools import PlottingTools
-from plot_params import validate_and_convert_params
 import logging
+# 导入日志配置
+from src.utils.logging_config import logger
+# 导入图表生成函数
+from src.charts.line_chart import generate_line_chart
+from src.charts.bar_chart import generate_bar_chart
+from src.charts.pie_chart import generate_pie_chart
+from src.charts.scatter_plot import generate_scatter_plot
+from src.charts.heatmap import generate_heatmap
+from src.charts.mermaid_chart import generate_mermaid_chart
 
-# 配置日志
-import os
-# 确保日志目录存在
-log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
-os.makedirs(log_dir, exist_ok=True)
-
-# 配置基础日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        # 控制台处理器
-        logging.StreamHandler(),
-        # 文件处理器 - 记录所有日志
-        logging.FileHandler(os.path.join(log_dir, 'plotting_service.log'), encoding='utf-8'),
-        # 错误日志文件处理器 - 只记录错误及以上级别日志
-        logging.FileHandler(os.path.join(log_dir, 'plotting_service_error.log'), encoding='utf-8')
-    ]
+# 导入工具函数
+from src.utils.plotting_utils import (
+    ChartConfig,
+    process_nested_params,
+    validate_parameters,
+    get_target_function,
+    filter_kwargs,
+    check_required_params,
+    execute_plotting,
+    handle_plotting_exception
 )
 
-# 设置错误日志处理器的级别为ERROR
-for handler in logging.getLogger().handlers:
-    if isinstance(handler, logging.FileHandler) and 'error.log' in handler.baseFilename:
-        handler.setLevel(logging.ERROR)
-
-logger = logging.getLogger(__name__)
+# 导入字体工具
+from src.utils.font_utils import setup_fonts
 
 # 解析命令行参数
 parser = argparse.ArgumentParser(description='MCP绘图服务')
 parser.add_argument('--port', type=int, default=16666, help='服务端口号，默认为16666')
+parser.add_argument('--debug', action='store_true', help='启用调试模式')
 args = parser.parse_args()
+
+# 如果启用调试模式，设置应用日志为DEBUG级别
+if args.debug:
+    logger.setLevel(logging.DEBUG)
+    logger.debug("调试模式已启用")
+    # 调试模式下控制台也输出DEBUG级别日志
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            handler.setLevel(logging.DEBUG)
 
 # 创建FastMCP服务器实例
 mcp = FastMCP(name="PlottingService", host="0.0.0.0", port=args.port)
 
-# 创建绘图工具实例
-drawing_tools = PlottingTools()
+
+# 初始化字体设置
+try:
+    setup_fonts()
+    logger.info("字体设置已完成")
+except Exception as e:
+    logger.error(f"字体设置失败: {str(e)}")
+
+# 为ChartConfig添加图表函数映射
+ChartConfig.functions = {
+    'line_chart': generate_line_chart,
+    'bar_chart': generate_bar_chart,
+    'pie_chart': generate_pie_chart,
+    'scatter_plot': generate_scatter_plot,
+    'heatmap': generate_heatmap,
+    'mermaid_chart': generate_mermaid_chart
+}
 
 @mcp.tool()
 def create_plotting_task(plot_type, **params):
@@ -65,7 +81,7 @@ def create_plotting_task(plot_type, **params):
             - title: 图表标题（默认值: "图表标题"，支持除Mermaid图外的所有图表类型）
             - figsize: 图表尺寸，如 (10, 6)（默认: (10, 6)，支持除Mermaid图外的所有图表类型，饼图默认(8,8)）
             - dpi: 分辨率（默认: 100，支持除Mermaid图外的所有图表类型）
-            - theme: 支持所有matplotlib内置主题（默认: "default"，支持除Mermaid图外的所有图表类型），可选值包括: 'default', 'classic', 'dark_background', 'seaborn', 'ggplot'
+            - theme: 图表主题（默认: "default"，Mermaid支持'default', 'dark', 'forest', 'neutral'。其余图表则支持所有Matplotlib内置主题）
             - colors: 颜色列表（可选，用于折线图、柱状图和饼图），示例: ['#1f77b4', '#ff7f0e', '#2ca02c']
             - grid: 是否显示网格（默认: True，用于折线图、柱状图和散点图）
             
@@ -98,6 +114,8 @@ def create_plotting_task(plot_type, **params):
                 start_angle: 起始角度（默认: 90），控制饼图的起始角度
                 shadow: 是否显示阴影（默认: False）
                 labeldistance: 标签距离（默认: 1.1），控制标签与中心的距离
+                legend: 是否显示图例（默认: True）
+                legend_loc: 图例位置（默认: 'right'）
                 
             scatter_plot（散点图）:
                 x_field: X轴字段名（必需）
@@ -126,70 +144,41 @@ def create_plotting_task(plot_type, **params):
                 
             mermaid_chart（Mermaid图）:
                 mermaid_code: Mermaid图代码（必需）
-                # Mermaid图仅支持save_path基础参数，不支持其他通用参数
+                width: 图像宽度（默认: 800）
+                height: 图像高度（默认: 600）
         
     Returns:
         dict: 包含图表保存路径和状态的响应
     """
     try:
-        # 处理params参数，如果params是一个包含单个'params'键的字典
-        logger.info(f"接收到的参数: plot_type={plot_type}, params={params}")
+        # logger.info(f"接收到的参数: plot_type={plot_type}, params={params}")
         
-        # 检查是否是嵌套的params结构
-        if isinstance(params, dict) and 'params' in params and len(params) == 1:
-            logger.info("检测到嵌套的params结构，提取内部参数")
-            params = params['params']
+        # 处理嵌套参数结构
+        params = process_nested_params(params)
+        # logger.debug(f"处理后的参数: {params}")
         
-        # 使用pydantic模型验证并转换参数
-        validated_params = validate_and_convert_params(plot_type, params)
-        
-        # 确保save_path参数存在
-        save_path = validated_params.get('save_path')
-        if not save_path:
-            raise ValueError("缺少必需的参数: save_path")
-        
-        logger.info(f"生成图表，图表类型: {plot_type}")
-        
-        # 直接调用绘图工具的相应函数
-        # 过滤掉绘图函数不接受的参数
-        if plot_type == 'line_chart':
-            # 获取generate_line_chart函数接受的参数列表
-            sig = inspect.signature(drawing_tools.generate_line_chart)
-            # 只传递函数接受的参数
-            filtered_params = {k: v for k, v in validated_params.items() if k in sig.parameters}
-            result = drawing_tools.generate_line_chart(**filtered_params)
-        elif plot_type == 'bar_chart':
-            # 类似处理
-            sig = inspect.signature(drawing_tools.generate_bar_chart)
-            filtered_params = {k: v for k, v in validated_params.items() if k in sig.parameters}
-            result = drawing_tools.generate_bar_chart(**filtered_params)
-        elif plot_type == 'pie_chart':
-            # 类似处理
-            sig = inspect.signature(drawing_tools.generate_pie_chart)
-            filtered_params = {k: v for k, v in validated_params.items() if k in sig.parameters}
-            result = drawing_tools.generate_pie_chart(**filtered_params)
-        elif plot_type == 'scatter_plot':
-            # 类似处理
-            sig = inspect.signature(drawing_tools.generate_scatter_plot)
-            filtered_params = {k: v for k, v in validated_params.items() if k in sig.parameters}
-            result = drawing_tools.generate_scatter_plot(**filtered_params)
-        elif plot_type == 'heatmap':
-            # 类似处理
-            sig = inspect.signature(drawing_tools.generate_heatmap)
-            filtered_params = {k: v for k, v in validated_params.items() if k in sig.parameters}
-            result = drawing_tools.generate_heatmap(**filtered_params)
-        elif plot_type == 'mermaid_chart':
-            # 类似处理
-            sig = inspect.signature(drawing_tools.generate_mermaid_chart)
-            filtered_params = {k: v for k, v in validated_params.items() if k in sig.parameters}
-            result = drawing_tools.generate_mermaid_chart(**filtered_params)
-        else:
+        # 检查图表类型支持
+        if plot_type not in ChartConfig.functions:
             raise ValueError(f"不支持的图表类型: {plot_type}")
+        
+        # 验证参数
+        validate_parameters(plot_type, params)
+        
+        # 获取绘图函数和过滤参数
+        plot_func = ChartConfig.functions[plot_type]
+        target_func, target_sig = get_target_function(plot_type, plot_func)
+        filtered_params = filter_kwargs(params, target_sig)
+        
+        # 检查必需参数
+        check_required_params(plot_type, params)
+        
+        # 执行绘图
+        logger.info(f"生成图表，图表类型: {plot_type}")
+        result = execute_plotting(plot_func, filtered_params, target_sig)
         
         return {"status": "success", "message": "图表生成成功", "save_path": result}
     except Exception as e:
-        logger.exception("生成图表时发生异常")
-        return {"status": "error", "message": f"生成图表失败: {str(e)}"}
+        return handle_plotting_exception(e, args.debug)
 
 
 # 启动MCP服务线程

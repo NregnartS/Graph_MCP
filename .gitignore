@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
 
 # Distribution / packaging
 build/
@@ -13,6 +15,7 @@ dist/
 .venv
 venv/
 env/
+.env/
 
 # Logs
 logs/
@@ -40,12 +43,40 @@ pids
 ehthumbs.db
 Thumbs.db
 
-# Testing
+# Output and result files
+output/
 test_outputs/
 *.png
+*.svg
+*.pdf
+*.jpg
+*.jpeg
 *.mmd
 
 # Temporary files
 *.tmp
 *.temp
 node_modules
+.cache/
+.temp/
+
+# Testing and coverage
+.coverage
+coverage.xml
+.pytest_cache/
+.htmlcov/
+
+# Configuration files
+config.ini
+settings.yaml
+*.local
+
+# Dependency management
+poetry.lock
+.pip/
+.pipenv/
+
+# Build and distribution
+*.spec
+
+cache
