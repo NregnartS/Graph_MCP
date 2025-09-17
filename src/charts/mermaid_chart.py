@@ -124,6 +124,7 @@ class MermaidChart(PlottingBase):
             # 执行mmdc命令
             result = subprocess.run(
                 cmd,
+                shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
