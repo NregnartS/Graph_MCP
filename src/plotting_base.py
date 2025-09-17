@@ -74,7 +74,7 @@ class PlottingBase:
             return False
             
         # 检查是否包含非法字符
-        invalid_chars = set('<>":|?*')
+        invalid_chars = set('<>"|?*')
         if any(char in invalid_chars for char in file_path):
             return False
             
