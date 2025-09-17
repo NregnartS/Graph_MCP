@@ -127,7 +127,8 @@ class MermaidChart(PlottingBase):
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                encoding='utf-8'
             )
             
             # 检查命令执行结果
