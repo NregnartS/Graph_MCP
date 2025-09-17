@@ -33,6 +33,7 @@ class MermaidChart(PlottingBase):
         try:
             subprocess.run(
                 ["mmdc", "--version"],
+                shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=True
