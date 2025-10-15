@@ -30,7 +30,7 @@ graph_all/
 │   │   ├── logging_config.py # 日志配置
 │   │   └── plotting_utils.py # 绘图工具函数
 │   └── plotting_base.py    # 绘图基类
-├── main.py                 # 主程序入口
+├── graph_mcp.py            # 主程序入口
 ├── requirements.txt        # 项目依赖
 └── README.md               # 项目说明文档
 ```
@@ -55,53 +55,82 @@ graph_all/
 
 ## 安装指南
 
-### 环境要求
+### 环境准备
 - Python 3.10+ 
-- 依赖库：详见 requirements.txt
-
-### 安装步骤
-
-1. 克隆项目代码
-
-```bash
-git clone <项目仓库地址>
-cd graph_all
-```
-
-2. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-3. 安装Mermaid CLI（可选，用于生成Mermaid图表）
+- Mermaid CLI（可选，建议安装）
 
 ```bash
 # 使用npm安装
 npm install -g @mermaid-js/mermaid-cli
 
-# 或者使用yarn
-# yarn global add @mermaid-js/mermaid-cli
-
 # 验证安装是否成功
 mmdc --version
 ```
 
-**注意**：安装mermaid-cli需要先安装Node.js。如果未安装mermaid-cli，系统会自动使用mermaid-py库作为备选方案。
+**注意**：安装mermaid-cli需要先安装Node.js。如果未安装mermaid-cli，程序会自动使用mermaid-py库作为备选方案，而该库渲染mermaid图不稳定。
 
-## 使用说明
+### 一键安装/卸载脚本
 
-### 启动服务
+本项目提供跨平台一键安装与卸载脚本，自动创建python虚拟环境并安装依赖，推荐优先使用。
 
-```bash
-python main.py [--port 端口号] [--debug]
+**注意**：一键安装脚本不会安装mermaid-cli，如需使用mermaid-cli，请自行安装。
+
+#### Windows
+- 安装（默认端口 16666，可加 -Port 指定端口，-Debug 输出调试日志）：
+  ```powershell
+  .\install_windows.ps1 [-Port 16666] [-Debug]
+  ```
+  行为概述：
+  - 创建/使用虚拟环境并安装依赖
+  - 写入 MCP 客户端配置（graph_mcp 服务端）
+  - 尝试创建“开机登录时执行”的计划任务（schtasks，非管理员）
+  - 若计划任务创建失败，自动在“启动”文件夹创建快捷方式，并立即隐藏窗口启动一次服务
+  - 若计划任务创建成功，会通过 schtasks 立即启动一次服务
+
+- 卸载：
+  ```powershell
+  .\uninstall_windows.ps1 [-Purge] [-RemoveVenv] [-Debug]
+  ```
+  参数说明：
+  - -Purge：额外清理 .venv、logs、output、.cache
+  - -RemoveVenv：仅删除 .venv（不等同于 -Purge）
+  - 脚本会结束并删除计划任务、移除启动快捷方式、清理 MCP 客户端配置中的 graph_mcp 项
+  - 会尝试结束与本仓库 graph_mcp.py 相关的残留 Python 进程
+
+- 日志位置：
+  - logs\server.out.log
+  - logs\server.err.log
+
+- 变更端口：
+  重新执行安装脚本并指定新的 -Port 参数，脚本会重建计划任务/快捷方式。
+
+#### Linux
+- 安装（默认端口 16666，可加 --port 指定端口）：
+  ```bash
+  bash ./install_linux.sh [--port 16666]
+  ```
+
+- 卸载：
+  ```bash
+  bash ./uninstall_linux.sh [--purge]
+  ```
+  参数说明：
+  - --purge：额外清理 .venv、logs、output、.cache
+
+## 使用示例
+
+```
+# 模糊命令
+绘制当前项目的各种说明图例
+总结\src\data\目录下的数据并绘制图例全面说明
+
+# 精确命令
+基于src\test.csv中的数据绘制折线图，要求x轴为xx，Y轴为yy，X轴标签为aa，Y轴标签为bb，风格尽量简洁，保存到output文件夹下的test.png
+为当前项目的安装流程绘制流程图，保存到output文件夹下的install.svg
 ```
 
-参数说明：
-- `--port`：指定服务端口，默认16666
-- `--debug`：启用调试模式，显示更详细的日志
 
-## 图表类型与参数
+## 支持图表类型与参数
 
 ### 通用参数
 
@@ -222,28 +251,12 @@ python main.py [--port 端口号] [--debug]
 {
   "mcpServers": {
     "graph_service": {
+      "type": "streamableHttp",
       "url": "http://127.0.0.1:16666/mcp"
     }
   }
 }
 ```
-
-## 开发说明
-
-### 代码风格
-- 遵循PEP 8规范
-- 使用type hints进行类型标注
-- 添加适当的文档字符串
-
-## 常见问题
-
-### Q: 中文字体显示不正常怎么办？
-A: 服务会自动检测系统中的中文字体，如果没有找到合适的字体，可以在`font_utils.py`中手动指定字体路径。
-
-### Q: Mermaid图表生成失败怎么办？
-A: 确保已安装Mermaid CLI，或者使用mermaid-py库作为替代方案。
-
-
 
 ## 注意事项
 
